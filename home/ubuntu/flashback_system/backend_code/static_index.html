@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang=\"pt-BR\">
+<head>
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>Flashback Admin - Sistema de Gerenciamento</title>
+    <script src=\"https://cdn.tailwindcss.com\"></script>
+    <script src=\"https://unpkg.com/lucide@latest/dist/umd/lucide.js\"></script>
+    <style>
+        .neon-glow {
+            text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff;
+        }
+        .cyber-card {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 100, 255, 0.1));
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        .cyber-button {
+            background: linear-gradient(45deg, #0066ff, #00ffff);
+            transition: all 0.3s ease;
+        }
+        .cyber-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 255, 0.4);
+        }
+        .status-pending { color: #fbbf24; }
+        .status-confirmed { color: #10b981; }
+        .status-rejected { color: #ef4444; }
+    </style>
+</head>
+<body class=\"bg-gray-900 text-white min-h-screen\">
+    <!-- Header -->
+    <header class=\"bg-black border-b border-cyan-500 p-4\">
+        <div class=\"container mx-auto flex items-center justify-between\">
+            <h1 class=\"text-2xl font-bold neon-glow\">FLASHBACK ADMIN</h1>
+            <div class=\"flex items-center space-x-4\">
+                <span class=\"text-cyan-400\">Sistema de Gerenciamento</span>
+                <button onclick=\"refreshData()\" class=\"cyber-button px-4 py-2 rounded text-white font-semibold\">
+                    <i data-lucide=\"refresh-cw\" class=\"w-4 h-4 inline mr-2\"></i>
+                    Atualizar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard -->
+    <div class=\"container mx-auto p-6\">
+        <!-- Estatísticas -->
+        <div class=\"grid grid-cols-1 md:grid-cols-4 gap-6 mb-8\">
+            <div class=\"cyber-card p-6 rounded-lg\">
+                <div class=\"flex items-center justify-between\">
+                    <div>
+                        <p class=\"text-cyan-400 text-sm\">Total RSVPs</p>
+                        <p class=\"text-2xl font-bold\" id=\"total-rsvps\">0</p>
+                    </div>
+                    <i data-lucide=\"users\" class=\"w-8 h-8 text-cyan-400\"></i>
+                </div>
+            </div>
+            <div class=\"cyber-card p-6 rounded-lg\">
+                <div class=\"flex items-center justify-between\">
+                    <div>
+                        <p class=\"text-green-400 text-sm\">Pagamentos Confirmados</p>
+                        <p class=\"text-2xl font-bold\" id=\"confirmed-payments\">0</p>
+                    </div>
+                    <i data-lucide=\"check-circle\" class=\"w-8 h-8 text-green-400\"></i>
+                </div>
+            </div>
+            <div class=\"cyber-card p-6 rounded-lg\">
+                <div class=\"flex items-center justify-between\">
+                    <div>
+                        <p class=\"text-yellow-400 text-sm\">Pagamentos Pendentes</p>
+                        <p class=\"text-2xl font-bold\" id=\"pending-payments\">0</p>
+                    </div>
+                    <i data-lucide=\"clock\" class=\"w-8 h-8 text-yellow-400\"></i>
+                </div>
+            </div>
+            <div class=\"cyber-card p-6 rounded-lg\">
+                <div class=\"flex items-center justify-between\">
+                    <div>
+                        <p class=\"text-cyan-400 text-sm\">Total Convidados</p>
+                        <p class=\"text-2xl font-bold\" id=\"total-guests\">0</p>
+                    </div>
+                    <i data-lucide=\"user-plus\" class=\"w-8 h-8 text-cyan-400\"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <div class=\"flex justify-between items-center mb-6\">
+            <h2 class=\"text-xl font-bold text-cyan-400\">Gerenciar RSVPs</h2>
+            <button onclick=\"openAddModal()\" class=\"cyber-button px-6 py-2 rounded text-white font-semibold\">
+                <i data-lucide=\"plus\" class=\"w-4 h-4 inline mr-2\"></i>
+                Adicionar Pessoa
+            </button>
+        </div>
+
+        <!-- Tabela de RSVPs -->
+        <div class=\"cyber-card rounded-lg overflow-hidden\">
+            <div class=\"overflow-x-auto\">
+                <table class=\"w-full\">
+                    <thead class=\"bg-gray-800\">
+                        <tr>
+                            <th class=\"px-4 py-3 text-left\">Nome</th>
+                            <th class=\"px-4 py-3 text-left\">Email</th>
+                            <th class=\"px-4 py-3 text-left\">Telefone</th>
+                            <th class=\"px-4 py-3 text-left\">Convidados</th>
+                            <th class=\"px-4 py-3 text-left\">Prato</th>
+                            <th class=\"px-4 py-3 text-left\">Valor</th>
+                            <th class=\"px-4 py-3 text-left\">Status</th>
+                            <th class=\"px-4 py-3 text-left\">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id=\"rsvp-table-body\">
+                        <!-- Dados serão carregados via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Status dos Pratos -->
+        <div class=\"mt-8\">
+            <h2 class=\"text-xl font-bold text-cyan-400 mb-4\">Status dos Pratos</h2>
+            <div class=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\" id=\"dishes-grid\">
+                <!-- Dados serão carregados via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Adicionar/Editar -->
+    <div id=\"rsvp-modal\" class=\"fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50\">
+        <div class=\"cyber-card p-6 rounded-lg max-w-md w-full mx-4\">
+            <div class=\"flex justify-between items-center mb-4\">
+                <h3 class=\"text-lg font-bold text-cyan-400\" id=\"modal-title\">Adicionar Pessoa</h3>
+                <button onclick=\"closeModal()\" class=\"text-gray-400 hover:text-white\">
+                    <i data-lucide=\"x\" class=\"w-6 h-6\"></i>
+                </button>
+            </div>
+            <form id=\"rsvp-form\">
+                <input type=\"hidden\" id=\"rsvp-id\">
+                <div class=\"space-y-4\">
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Nome *</label>
+                        <input type=\"text\" id=\"name\" required class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Email *</label>
+                        <input type=\"email\" id=\"email\" required class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Telefone</label>
+                        <input type=\"tel\" id=\"phone\" class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Número de Convidados</label>
+                        <input type=\"number\" id=\"guests\" min=\"1\" value=\"1\" class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Prato *</label>
+                        <select id=\"selected-dish\" required class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                            <option value=\"\">Selecione um prato</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Tipo de Pagamento</label>
+                        <select id=\"payment-type\" class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                            <option value=\"individual\">Individual (R$ 60/pessoa)</option>
+                            <option value=\"casal\">Casal (R$ 100)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Status do Pagamento</label>
+                        <select id=\"payment-status\" class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\">
+                            <option value=\"pending\">Pendente</option>
+                            <option value=\"confirmed\">Confirmado</option>
+                            <option value=\"rejected\">Rejeitado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class=\"block text-sm font-medium mb-1\">Observações</label>
+                        <textarea id=\"notes\" rows=\"3\" class=\"w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded focus:border-cyan-400 focus:outline-none\"></textarea>
+                    </div>
+                </div>
+                <div class=\"flex justify-end space-x-3 mt-6\">
+                    <button type=\"button\" onclick=\"closeModal()\" class=\"px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700\">
+                        Cancelar
+                    </button>
+                    <button type=\"submit\" class=\"cyber-button px-4 py-2 rounded text-white font-semibold\">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src=\"admin.js\"></script>
+    <script>
+        // Inicializar ícones Lucide
+        lucide.createIcons();
+        
+        // Carregar dados ao inicializar
+        document.addEventListener(\'DOMContentLoaded\', function() {
+            loadStats();
+            loadRSVPs();
+            loadDishes();
+            loadDishOptions();
+        });
+    </script>
+</body>
+</html>
+
+

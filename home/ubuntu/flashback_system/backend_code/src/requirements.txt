@@ -1,0 +1,7 @@
+Flask==3.0.0
+Flask-SQLAlchemy
+SQLAlchemy
+Flask-Cors
+gunicorn
+psycopg2-binary
+python-dotenv
