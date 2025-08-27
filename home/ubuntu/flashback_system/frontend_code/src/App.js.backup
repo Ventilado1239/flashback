@@ -1,0 +1,627 @@
+import { useState, useEffect } from 'react'
+import { Button } from './components/ui/button.jsx'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card.jsx'
+import { Input } from './components/ui/input.jsx'
+import { Label } from './components/ui/label.jsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.jsx'
+import { Badge } from './components/ui/badge.jsx'
+import { Calendar, Clock, MapPin, Music, Users, DollarSign, ChefHat, Sparkles, Zap, Cpu } from 'lucide-react'
+import { partyInfo, menuItems } from './data/menu.js'
+import './App.css'
+
+// URL do backend - ajuste conforme necessário
+const API_URL = 'https://kkh7ikcymple.manus.space/api'
+
+function App() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    guests: 1,
+    selectedDish: '',
+    paymentType: 'individual'
+  })
+  const [availableItems, setAvailableItems] = useState(menuItems)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [currentDecade, setCurrentDecade] = useState('60s')
+
+  // Música do YouTube com autoplay
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [youtubePlayer, setYoutubePlayer] = useState(null)
+
+  // Inicializar player do YouTube
+  useEffect(() => {
+    // Carregar API do YouTube
+    const loadYouTubeAPI = () => {
+      if (window.YT) {
+        initializePlayer()
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://www.youtube.com/iframe_api'
+      script.async = true
+      document.head.appendChild(script)
+
+      window.onYouTubeIframeAPIReady = initializePlayer
+    }
+
+    const initializePlayer = () => {
+      const player = new window.YT.Player('youtube-player', {
+        height: '0',
+        width: '0',
+        videoId: 'djV11Xbc914', // ID do vídeo "Take On Me" do A-ha
+        playerVars: {
+          autoplay: 1,
+          loop: 1,
+          playlist: 'djV11Xbc914',
+          controls: 0,
+          showinfo: 0,
+          rel: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          start: 0
+        },
+        events: {
+          onReady: (event) => {
+            setYoutubePlayer(event.target)
+            event.target.setVolume(20) // Volume baixo
+            
+            // Tentar tocar automaticamente após interação
+            const startOnInteraction = () => {
+              try {
+                event.target.playVideo()
+                setIsPlaying(true)
+                document.removeEventListener('click', startOnInteraction)
+                document.removeEventListener('touchstart', startOnInteraction)
+              } catch (error) {
+                console.log('Aguardando interação do usuário')
+              }
+            }
+
+            document.addEventListener('click', startOnInteraction)
+            document.addEventListener('touchstart', startOnInteraction)
+          },
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true)
+            } else if (event.data === window.YT.PlayerState.PAUSED) {
+              setIsPlaying(false)
+            }
+          }
+        }
+      })
+    }
+
+    loadYouTubeAPI()
+  }, [])
+
+  const toggleMusic = () => {
+    if (youtubePlayer) {
+      if (isPlaying) {
+        youtubePlayer.pauseVideo()
+        setIsPlaying(false)
+      } else {
+        youtubePlayer.playVideo()
+        setIsPlaying(true)
+      }
+    }
+  }
+
+  const decades = {
+    '60s': { 
+      color: 'from-cyan-400 via-blue-500 to-purple-600', 
+      title: 'Anos 60',
+      pattern: 'future-grid'
+    },
+    '70s': { 
+      color: 'from-blue-400 via-cyan-500 to-teal-600', 
+      title: 'Anos 70',
+      pattern: 'circuit-pattern'
+    },
+    '80s': { 
+      color: 'from-purple-500 via-blue-600 to-cyan-500', 
+      title: 'Anos 80',
+      pattern: 'future-grid'
+    },
+    '90s': { 
+      color: 'from-indigo-600 via-blue-700 to-cyan-600', 
+      title: 'Anos 90',
+      pattern: 'circuit-pattern'
+    }
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const decadeKeys = Object.keys(decades)
+      const currentIndex = decadeKeys.indexOf(currentDecade)
+      const nextIndex = (currentIndex + 1) % decadeKeys.length
+      setCurrentDecade(decadeKeys[nextIndex])
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [currentDecade])
+
+  const calculateTotal = () => {
+    const basePrice = formData.paymentType === 'couple' ? partyInfo.prices.couple : partyInfo.prices.individual
+    return formData.paymentType === 'individual' ? basePrice * formData.guests : basePrice
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!formData.selectedDish) {
+      alert('Por favor, selecione um prato para levar!')
+      return
+    }
+    
+    try {
+      // Preparar dados para envio
+      const submitData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        guests: formData.guests,
+        selected_dish: availableItems.find(item => item.id === parseInt(formData.selectedDish))?.name,
+        payment_type: formData.paymentType
+      }
+      
+      // Enviar para o backend
+      const response = await fetch(`${API_URL}/rsvps`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData)
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Atualizar contador do prato selecionado localmente
+        setAvailableItems(prev => 
+          prev.map(item => {
+            if (item.id === parseInt(formData.selectedDish)) {
+              const newSelectedCount = item.selectedCount + 1
+              const newSelectedBy = [...item.selectedBy, formData.name]
+              return { 
+                ...item, 
+                selectedCount: newSelectedCount,
+                selectedBy: newSelectedBy,
+                available: newSelectedCount < item.maxCount
+              }
+            }
+            return item
+          })
+        )
+        
+        setIsSubmitted(true)
+      } else {
+        alert(result.error || 'Erro ao enviar RSVP. Tente novamente.')
+      }
+    } catch (error) {
+      console.error('Erro ao enviar RSVP:', error)
+      alert('Erro de conexão. Verifique sua internet e tente novamente.')
+    }
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-blue-900 to-cyan-900 flex items-center justify-center p-4 future-grid">
+        <Card className="max-w-md w-full text-center retro-card">
+          <CardHeader>
+            <CardTitle className="text-2xl text-cyan-400 neon-glow">⚡ CONFIRMAÇÃO RECEBIDA! ⚡</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-white">Obrigado, <strong className="text-cyan-400">{formData.name}</strong>!</p>
+            <p className="text-white">Seu RSVP foi registrado com sucesso.</p>
+            <p className="text-white">Prato selecionado: <Badge variant="outline" className="border-cyan-400 text-cyan-400">{availableItems.find(item => item.id === parseInt(formData.selectedDish))?.name}</Badge></p>
+            <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 p-4 rounded-lg border border-cyan-400/30">
+              <p className="text-cyan-400 font-semibold">
+                💰 Total: R$ {calculateTotal()},00
+              </p>
+              <p className="text-sm text-white/80 mt-2">
+                Faça o PIX e envie o comprovante para confirmação!
+              </p>
+            </div>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-black font-semibold"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              Fazer Novo RSVP
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black text-white overflow-x-hidden">
+      {/* Player do YouTube invisível */}
+      <div id="youtube-player" style={{ display: 'none' }}></div>
+      
+      {/* Background animado futurístico - mais sutil */}
+      <div className={`fixed inset-0 bg-gradient-to-br ${decades[currentDecade].color} opacity-20 decade-transition ${decades[currentDecade].pattern}`}></div>
+      
+      {/* Overlay de circuitos - mais sutil */}
+      <div className="fixed inset-0 opacity-10 circuit-pattern"></div>
+      
+      {/* Player de música futurístico */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button
+          onClick={toggleMusic}
+          variant="outline"
+          size="sm"
+          className="button-primary"
+        >
+          <Music className="w-4 h-4 mr-2" />
+          {isPlaying ? '⏸️ Take On Me' : '▶️ Take On Me'} ♪
+        </Button>
+      </div>
+
+      <div className="relative z-10">
+        {/* Hero Section Futurístico */}
+        <section className="min-h-screen flex items-center justify-center text-center p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-8">
+              <Cpu className="w-16 h-16 mx-auto mb-4 text-cyan-400 animate-spin" style={{animationDuration: '8s'}} />
+            </div>
+            
+            {/* Logo gerado */}
+            <div className="mb-8">
+              <div className="mx-auto max-w-full h-auto opacity-90 hover:opacity-100 transition-opacity duration-300 text-6xl">
+                🎉 FLASHBACK 🎉
+              </div>
+            </div>
+            
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 flashback-title neon-glow">
+              FESTA TEMPORAL
+            </h1>
+            <p className="text-xl md:text-3xl mb-8 text-cyan-300 font-mono">
+              > Uma viagem no tempo através das décadas_
+            </p>
+            <div className="flex justify-center space-x-4 text-sm md:text-base mb-8">
+              <Badge variant="outline" className="border-cyan-400/50 text-cyan-400 bg-black/30">1960s</Badge>
+              <Badge variant="outline" className="border-blue-400/50 text-blue-400 bg-black/30">1970s</Badge>
+              <Badge variant="outline" className="border-purple-400/50 text-purple-400 bg-black/30">1980s</Badge>
+              <Badge variant="outline" className="border-indigo-400/50 text-indigo-400 bg-black/30">1990s</Badge>
+            </div>
+            <div className="text-cyan-400 font-mono text-lg animate-pulse">
+              <Zap className="w-6 h-6 inline mr-2" />
+              SISTEMA ATIVADO - PREPARANDO VIAGEM TEMPORAL
+            </div>
+          </div>
+        </section>
+
+        {/* Informações da Festa - Tema Futurístico */}
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-4xl font-bold text-center mb-12 neon-title font-mono">
+              > DADOS DA MISSÃO_
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <Calendar className="w-5 h-5 mr-2" />
+                    DATA DE PARTIDA
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono text-lg">{partyInfo.date}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <Clock className="w-5 h-5 mr-2" />
+                    HORÁRIO TEMPORAL
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono text-lg">{partyInfo.time}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <MapPin className="w-5 h-5 mr-2" />
+                    COORDENADAS
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono text-sm">{partyInfo.location}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 button-primary"
+                    onClick={() => {
+                      const address = encodeURIComponent(partyInfo.location)
+                      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${address}`
+                      window.open(googleMapsUrl, '_blank')
+                    }}
+                  >
+                    <Zap className="w-3 h-3 mr-1" />
+                    NAVEGAR
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    PROTOCOLO DE VESTIMENTA
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono">{partyInfo.theme}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <Music className="w-5 h-5 mr-2" />
+                    SISTEMA DE ÁUDIO
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono">{partyInfo.dj}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="card-readable hover:scale-105 transition-transform">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-cyan-readable">
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    CUSTO ENERGÉTICO
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-readable font-mono">Individual: R$ {partyInfo.prices.individual},00</p>
+                  <p className="text-readable font-mono">Casal: R$ {partyInfo.prices.couple},00</p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Observação sobre preparo de frituras */}
+            {partyInfo.observation && (
+              <div className="mt-8 max-w-4xl mx-auto">
+                <Card className="card-readable">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start space-x-3">
+                      <ChefHat className="w-6 h-6 text-cyan-readable mt-1 flex-shrink-0" />
+                      <div>
+                        <h3 className="font-semibold text-cyan-readable mb-2 font-mono">OBSERVAÇÃO IMPORTANTE</h3>
+                        <p className="text-readable font-mono text-sm leading-relaxed">{partyInfo.observation}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Observação sobre cooler */}
+            {partyInfo.coolerObservation && (
+              <div className="mt-4 max-w-4xl mx-auto">
+                <Card className="card-readable">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start space-x-3">
+                      <Zap className="w-6 h-6 text-cyan-readable mt-1 flex-shrink-0" />
+                      <div>
+                        <h3 className="font-semibold text-cyan-readable mb-2 font-mono">LEMBRETE ESSENCIAL</h3>
+                        <p className="text-readable font-mono text-sm leading-relaxed">{partyInfo.coolerObservation}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Formulário RSVP Futurístico */}
+        <section className="py-16 px-4">
+          <div className="max-w-2xl mx-auto">
+            <Card className="card-readable">
+              <CardHeader>
+                <CardTitle className="text-2xl text-center neon-title flex items-center justify-center font-mono">
+                  <Users className="w-6 h-6 mr-2" />
+                  > REGISTRO DE VIAJANTE_
+                </CardTitle>
+                <p className="text-center text-readable font-mono">
+                  Insira seus dados para ativar o portal temporal
+                </p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-cyan-readable font-mono">Nome Completo *</Label>
+                    <Input 
+                      id="name" 
+                      name="name" 
+                      value={formData.name} 
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                      required 
+                      className="input-field"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-cyan-readable font-mono">Email *</Label>
+                    <Input 
+                      id="email" 
+                      name="email" 
+                      type="email" 
+                      value={formData.email} 
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                      required 
+                      className="input-field"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-cyan-readable font-mono">Telefone</Label>
+                    <Input 
+                      id="phone" 
+                      name="phone" 
+                      type="tel" 
+                      value={formData.phone} 
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                      className="input-field"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="guests" className="text-cyan-readable font-mono">Número de Convidados (incluindo você) *</Label>
+                    <Input 
+                      id="guests" 
+                      name="guests" 
+                      type="number" 
+                      value={formData.guests} 
+                      onChange={(e) => setFormData({ ...formData, guests: parseInt(e.target.value) || 1 })} 
+                      min="1" 
+                      required 
+                      className="input-field"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentType" className="text-cyan-readable font-mono">Tipo de Pagamento *</Label>
+                    <Select 
+                      onValueChange={(value) => setFormData({ ...formData, paymentType: value })} 
+                      value={formData.paymentType}
+                    >
+                      <SelectTrigger className="select-field">
+                        <SelectValue placeholder="Selecione o tipo de pagamento" />
+                      </SelectTrigger>
+                      <SelectContent className="select-content">
+                        <SelectItem value="individual">Individual (R$ {partyInfo.prices.individual}/pessoa)</SelectItem>
+                        <SelectItem value="couple">Casal (R$ {partyInfo.prices.couple})</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="selectedDish" className="text-cyan-readable font-mono">Prato que irá levar *</Label>
+                    <Select 
+                      onValueChange={(value) => setFormData({ ...formData, selectedDish: value })} 
+                      value={formData.selectedDish}
+                    >
+                      <SelectTrigger className="select-field">
+                        <SelectValue placeholder="Selecione um prato" />
+                      </SelectTrigger>
+                      <SelectContent className="select-content">
+                        {availableItems.map(item => (
+                          <SelectItem 
+                            key={item.id} 
+                            value={item.id.toString()} 
+                            disabled={!item.available}
+                          >
+                            {item.name} ({item.selectedCount}/{item.maxCount})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Card className="card-readable">
+                    <CardContent className="pt-4">
+                      <h3 className="font-semibold text-cyan-readable mb-2 font-mono">CUSTO TOTAL DA VIAGEM</h3>
+                      <p className="text-readable font-mono text-xl">⚡ R$ {calculateTotal()},00</p>
+                      <div className="mt-3 p-3 bg-black/50 rounded border border-cyan-400/30">
+                        <p className="text-sm text-cyan-readable font-mono">
+                          CHAVE PIX: <span className="text-white font-bold">{partyInfo.pixKey}</span>
+                        </p>
+                        <p className="text-sm text-readable mt-1 font-mono">
+                          Envie o comprovante após o pagamento para ativar o portal
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full button-primary font-mono text-lg py-3"
+                  >
+                    <Zap className="w-5 h-5 mr-2" />
+                    ATIVAR PORTAL TEMPORAL
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* Cardápio Disponível - Tema Futurístico */}
+        <section className="py-16 px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl font-bold text-center mb-8 neon-title font-mono">
+              > SUPRIMENTOS DISPONÍVEIS_
+            </h2>
+            <p className="text-center text-readable mb-8 font-mono">
+              Status dos suprimentos alimentares para a missão
+            </p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableItems.map(item => (
+                <Card 
+                  key={item.id} 
+                  className={`transition-all hover:scale-105 ${
+                    item.available 
+                      ? 'bg-gradient-to-br from-green-500/20 to-cyan-500/20 border-green-400/50' 
+                      : 'bg-gradient-to-br from-red-500/20 to-gray-500/20 border-red-400/50'
+                  }`}
+                >
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white font-mono font-medium text-sm">{item.name}</span>
+                      <Badge 
+                        variant={item.available ? "default" : "destructive"}
+                        className="font-mono text-xs"
+                      >
+                        {item.available ? "DISPONÍVEL" : "ESGOTADO"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-readable font-mono text-xs">
+                        Vagas: {item.selectedCount}/{item.maxCount}
+                      </span>
+                      <div className="w-16 bg-gray-700 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            item.available ? 'bg-green-400' : 'bg-red-400'
+                          }`}
+                          style={{ width: `${(item.selectedCount / item.maxCount) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    {item.selectedCount > 0 && (
+                      <p className="text-xs text-readable mt-2 font-mono">
+                        Últimos: {item.selectedBy.slice(-2).join(', ')}
+                        {item.selectedBy.length > 2 && ` +${item.selectedBy.length - 2}`}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Footer Futurístico */}
+        <footer className="py-8 text-center text-cyan-400/60 font-mono">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <Cpu className="w-4 h-4" />
+            <span>FLASHBACK 2025 - SISTEMA TEMPORAL ATIVO</span>
+            <Cpu className="w-4 h-4" />
+          </div>
+          <p className="text-xs">Uma experiência inesquecível através do tempo ⚡</p>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+export default App
+
+
+

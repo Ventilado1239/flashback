@@ -1,0 +1,14 @@
+# Python
+backend_code/src/.venv/
+__pycache__/
+*.pyc
+backend_code/src/.env
+backend_code/src/database/
+
+# Node/React
+frontend_code/node_modules/
+frontend_code/.env
+frontend_code/build/
+
+# Geral
+.DS_Store
