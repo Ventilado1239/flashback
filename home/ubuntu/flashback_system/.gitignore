@@ -1,0 +1,4 @@
+backend_code/src/.venv/
+backend_code/src/__pycache__/
+backend_code/src/database/
+*.pyc
